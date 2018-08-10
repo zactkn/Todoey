@@ -1,10 +1,9 @@
 import UIKit
-import CoreData
+import RealmSwift
 
 class CategoryTableViewController: UITableViewController {
-
-    var categories = [Category]()
-    let persistance = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    let realm = try! Realm()
+    var categories: Results<Category>?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -12,15 +11,19 @@ class CategoryTableViewController: UITableViewController {
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return categories.count
+        return categories?.count ?? 1
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let category = categories[indexPath.row]
-        
         let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
-        cell.textLabel?.text = category.name
-        cell.accessoryType = .disclosureIndicator
+        
+        if let category = categories?[indexPath.row] {
+            cell.textLabel?.text = category.name
+            cell.accessoryType = .disclosureIndicator
+        } else {
+            cell.textLabel?.text = "<Add categories>"
+            cell.accessoryType = .none
+        }
         
         return cell
     }
@@ -33,7 +36,7 @@ class CategoryTableViewController: UITableViewController {
         let destinationViewController = segue.destination as! TodoListViewController
         
         if let indexPath = tableView.indexPathForSelectedRow {
-            destinationViewController.category = categories[indexPath.row]
+            destinationViewController.category = categories?[indexPath.row]
         }
     }
 
@@ -47,29 +50,26 @@ class CategoryTableViewController: UITableViewController {
         }
         
         let add = UIAlertAction(title: "Add", style: .default) { (action) in
-            let category = Category(context: self.persistance)
+            let category = Category()
             category.name = categoryTextField.text!
             
-            self.categories.append(category)
-            self.persist()
+            self.persist(category: category)
             self.tableView.reloadData()
         }
         prompt.addAction(add)
         present(prompt, animated: true, completion: nil)
     }
     
-    func fetch(with filter: NSFetchRequest<Category> = Category.fetchRequest()) {
-        do {
-            categories = try persistance.fetch(filter)
-        } catch {
-            print("error fetching instances with error: \(error)")
-        }
+    func fetch() {
+        categories = realm.objects(Category.self)
         tableView.reloadData()
     }
     
-    func persist() {
+    func persist(category: Category) {
         do {
-            try persistance.save()
+            try realm.write {
+                realm.add(category)
+            }
         } catch {
             print("error persisting instances with error: \(error)")
         }
